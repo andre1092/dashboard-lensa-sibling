@@ -5,17 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
-  FileText, BarChart3, Users, Building2, Wrench,
+  BarChart3, Settings,
   LogOut, Menu, X, ChevronRight, Shield
 } from 'lucide-react';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { href: '/form', label: 'Form LENSA-SIBLING', icon: FileText, description: 'Isi form kunjungan' },
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3, description: 'Lihat analitik data' },
-  { href: '/form/builder', label: 'Form Builder', icon: Wrench, description: 'Bangun & edit form' },
-  { href: '/kelola-pegawai', label: 'Kelola Pegawai', icon: Users, description: 'Data ref pegawai' },
-  { href: '/kelola-faskes', label: 'Kelola Faskes', icon: Building2, description: 'Data ref faskes' },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3, description: 'Form & data kunjungan' },
+  { href: '/admin-setting', label: 'Admin Setting', icon: Settings, description: 'Pengaturan pengguna' },
 ];
 
 export default function AuthenticatedLayout({

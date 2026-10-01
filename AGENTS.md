@@ -75,11 +75,20 @@ Sebelum melakukan modifikasi atau menjalankan perintah apa pun di terminal JetBr
 ### 🔹 Status Terakhir / Pekerjaan yang Sedang Berjalan:
 - **BERHASIL DEPLOY KE PRODUCTION**: Aplikasi aktif di Vercel Production dengan domain `https://dashboard-lensa-sibling.vercel.app` (HTTP 200 OK).
 - Seluruh environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, kredensial Google Drive) telah terpasang di Vercel.
+- **Fase 4: Redesign Menu & Form Kunjungan**:
+  - Sidebar navigasi diubah menjadi hanya 3 item: Dashboard, Admin Setting, Logout
+  - Dashboard baru menampilkan Form Kunjungan LENSA-SiBLing (dropdown pegawai/faskes, date picker, pertanyaan alur + gambar, conditional logic Sudah/Belum)
+  - Halaman Admin Setting untuk kelola user (tabel user, tambah hak akses via modal)
+  - Migrasi SQL `002_user_profiles.sql` untuk tabel `user_profiles` dengan RLS dan auto-create trigger
+  - Build verification sukses: `npm run build` exit code 0, 12 routes
 
 ### 🔹 Langkah Tindakan Pengguna yang Tersisa:
 1. Mengaktifkan Google Drive API melalui tombol **Enable** di Google Cloud Console:
    https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1007260183840
-2. Menjalankan skrip `supabase/migrations/001_initial_schema.sql` terbaru di SQL Editor Supabase untuk mengaktifkan izin tabel `GRANT` dan RLS.
+2. Menjalankan skrip `supabase/migrations/001_initial_schema.sql` di SQL Editor Supabase (jika belum).
+3. **BARU**: Menjalankan skrip `supabase/migrations/002_user_profiles.sql` di SQL Editor Supabase untuk membuat tabel `user_profiles`.
+4. Re-deploy ke Vercel setelah perubahan code terbaru (`git push` atau manual deploy).
 
 ---
-*Terakhir Diperbarui Oleh Agen pada: 2026-10-01*
+*Terakhir Diperbarui Oleh Agen pada: 2026-10-02*
+
