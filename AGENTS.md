@@ -78,16 +78,21 @@ Sebelum melakukan modifikasi atau menjalankan perintah apa pun di terminal JetBr
 - **Fase 4: Redesign Menu & Form Kunjungan**:
   - Sidebar navigasi diubah menjadi hanya 3 item: Dashboard, Admin Setting, Logout
   - Dashboard baru menampilkan Form Kunjungan LENSA-SiBLing (dropdown pegawai/faskes, date picker, pertanyaan alur + gambar, conditional logic Sudah/Belum)
-  - Halaman Admin Setting untuk kelola user dengan tampilan kolom Username, Email, Password (toggle show/hide), Role, dan tombol Tambahkan Hak Akses
-  - Tombol instan "Muat Akun Pegawai Default" untuk mengisi akun pegawai Andreas, Khoiron, dan Wahyuadi secara otomatis
-  - Migrasi SQL `002_user_profiles.sql` dan `003_update_user_profiles.sql` untuk tabel `user_profiles` dengan kolom username & password
-  - Build verification sukses: `npm run build` exit code 0, 12 routes
+  - Redirect login & root page diubah langsung ke `/dashboard`
+- **Fase 5: Integrasi Penuh Supabase Authentication > Users**:
+  - Sinkronisasi dua arah dengan `auth.users` via API route `/api/admin/users` dan RPC `SECURITY DEFINER`
+  - Fitur Tambah User: akun langsung dibuat dan terkonfirmasi di `auth.users` sehingga langsung bisa login
+  - Fitur Edit Password (🔑): admin dapat mengubah kata sandi akun kapan saja dan langsung terupdate di `auth.users`
+  - Fitur Hapus User (🗑️): user langsung terhapus permanen dari `auth.users`
+  - Migrasi SQL `004_auth_users_management.sql` berisi fungsi RPC: `admin_get_users`, `admin_create_auth_user`, `admin_update_auth_user_password`, `admin_delete_auth_user`
+  - Build verification sukses: `npm run build` exit code 0, 13 routes
 
 ### 🔹 Langkah Tindakan Pengguna yang Tersisa:
-1. Mengaktifkan Google Drive API melalui tombol **Enable** di Google Cloud Console:
+1. Menjalankan skrip `supabase/migrations/004_auth_users_management.sql` di SQL Editor Supabase untuk mengaktifkan fungsi manajemen `auth.users`.
+2. Mengaktifkan Google Drive API melalui tombol **Enable** di Google Cloud Console:
    https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1007260183840
-2. Menjalankan skrip `supabase/migrations/003_update_user_profiles.sql` di SQL Editor Supabase untuk menambahkan kolom `username` dan `password` serta menyinkronkan data pengguna.
 
 ---
 *Terakhir Diperbarui Oleh Agen pada: 2026-10-02*
+
 

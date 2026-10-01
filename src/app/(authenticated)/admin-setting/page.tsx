@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import {
   Loader2, Plus, X, Users, Shield, Eye, EyeOff, Trash2, Save,
-  RefreshCw, Sparkles, AlertCircle
+  RefreshCw, KeyRound, AlertCircle, CheckCircle2, Sparkles
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -28,30 +27,6 @@ interface NewUserForm {
 
 const ROLES = ['admin', 'viewer', 'editor'];
 
-const DEFAULT_USERS: Array<Omit<UserRecord, 'created_at'> & { created_at?: string }> = [
-  {
-    id: 'a1111111-1111-1111-1111-111111111111',
-    username: 'andreas',
-    email: 'andreas@bpjs-kesehatan.go.id',
-    password: 'Andreas123!',
-    role: 'admin',
-  },
-  {
-    id: 'a2222222-2222-2222-2222-222222222222',
-    username: 'khoiron',
-    email: 'khoiron@bpjs-kesehatan.go.id',
-    password: 'Khoiron123!',
-    role: 'editor',
-  },
-  {
-    id: 'a3333333-3333-3333-3333-333333333333',
-    username: 'wahyuadi',
-    email: 'wahyuadi@bpjs-kesehatan.go.id',
-    password: 'Wahyuadi123!',
-    role: 'viewer',
-  },
-];
-
 // ─── Main Page ──────────────────────────────────────────────
 export default function AdminSettingPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -59,83 +34,38 @@ export default function AdminSettingPage() {
   const [showModal, setShowModal] = useState(false);
   const [newUser, setNewUser] = useState<NewUserForm>({ username: '', email: '', password: '', role: 'viewer' });
   const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const supabase = createClient();
+  // Password Edit Modal State
+  const [editPasswordUser, setEditPasswordUser] = useState<UserRecord | null>(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  // ─── Fetch Users ──────────────────────────────────────
+  // ─── Fetch Users from Supabase Auth ───────────────────
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const { data, error: fetchErr } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (fetchErr) {
-        console.warn('user_profiles fetch warning:', fetchErr.message);
-        setUsers([]);
+      const res = await fetch('/api/admin/users', { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data.users) {
+        setUsers(data.users);
       } else {
-        setUsers(data || []);
+        setError(data.error || 'Gagal memuat pengguna');
       }
     } catch {
-      setUsers([]);
+      setError('Gagal menghubungi server untuk mengambil data pengguna');
     }
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     fetchUsers();
+  }, [fetchUsers]);
 
-    // Subscribe to realtime changes
-    const channel = supabase
-      .channel('user_profiles_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_profiles' },
-        () => fetchUsers()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchUsers, supabase]);
-
-  // ─── Seed Default Users ───────────────────────────────
-  const handleSeedDefaults = async () => {
-    setSeeding(true);
-    setError('');
-    try {
-      const { error: seedErr } = await supabase
-        .from('user_profiles')
-        .upsert(
-          DEFAULT_USERS.map((u) => ({
-            id: u.id,
-            username: u.username,
-            email: u.email,
-            password: u.password,
-            role: u.role,
-          }))
-        );
-
-      if (seedErr) {
-        setError('Gagal memuat akun default: ' + seedErr.message);
-      } else {
-        setSuccess('3 Akun Pegawai BPJS (Andreas, Khoiron, Wahyuadi) berhasil dimuat!');
-        await fetchUsers();
-        setTimeout(() => setSuccess(''), 4000);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
-    }
-    setSeeding(false);
-  };
-
-  // ─── Add User ─────────────────────────────────────────
+  // ─── Add User to Supabase Authentication ──────────────
   const handleAddUser = async () => {
     if (!newUser.username.trim() || !newUser.email.trim() || !newUser.password.trim()) {
       setError('Username, email, dan password wajib diisi');
@@ -150,60 +80,93 @@ export default function AdminSettingPage() {
     setError('');
 
     try {
-      // 1. Sign up to Supabase Auth if possible
-      let userId = crypto.randomUUID();
-      try {
-        const { data: authData } = await supabase.auth.signUp({
-          email: newUser.email,
-          password: newUser.password,
-          options: {
-            data: {
-              username: newUser.username,
-              password: newUser.password,
-            },
-          },
-        });
-        if (authData?.user?.id) {
-          userId = authData.user.id;
-        }
-      } catch (authErr) {
-        console.warn('Supabase auth signup notice:', authErr);
-      }
-
-      // 2. Insert into user_profiles table with plain credentials for admin supervision
-      const { error: profileError } = await supabase.from('user_profiles').upsert({
-        id: userId,
-        username: newUser.username.trim(),
-        email: newUser.email.trim(),
-        password: newUser.password,
-        role: newUser.role,
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
       });
+      const data = await res.json();
 
-      if (profileError) {
-        setError('Gagal menyimpan profil: ' + profileError.message);
+      if (!res.ok) {
+        setError(data.error || 'Gagal menambahkan user');
         setSaving(false);
         return;
       }
 
-      setSuccess(`User "${newUser.username}" berhasil ditambahkan!`);
+      setSuccess(`User "${newUser.username}" berhasil dibuat di Supabase Auth & Profil!`);
       setShowModal(false);
       setNewUser({ username: '', email: '', password: '', role: 'viewer' });
       await fetchUsers();
       setTimeout(() => setSuccess(''), 4000);
     } catch {
-      setError('Gagal menambahkan user');
+      setError('Terjadi kesalahan saat menambahkan user');
     }
 
     setSaving(false);
   };
 
-  // ─── Delete User ──────────────────────────────────────
-  const handleDeleteUser = async (userId: string, username?: string) => {
-    if (!confirm(`Yakin ingin menghapus user ${username || ''}?`)) return;
+  // ─── Update User Password in Supabase Auth ────────────
+  const handleUpdatePassword = async () => {
+    if (!editPasswordUser || !newPasswordVal.trim()) {
+      setError('Kata sandi baru tidak boleh kosong');
+      return;
+    }
+    if (newPasswordVal.length < 6) {
+      setError('Kata sandi minimal 6 karakter');
+      return;
+    }
 
-    const { error: delErr } = await supabase.from('user_profiles').delete().eq('id', userId);
-    if (!delErr) {
+    setUpdatingPassword(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editPasswordUser.id,
+          password: newPasswordVal.trim(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Gagal mengubah password');
+        setUpdatingPassword(false);
+        return;
+      }
+
+      setSuccess(`Kata sandi untuk "${editPasswordUser.username || editPasswordUser.email}" berhasil diperbarui di Supabase Auth!`);
+      setEditPasswordUser(null);
+      setNewPasswordVal('');
       await fetchUsers();
+      setTimeout(() => setSuccess(''), 4000);
+    } catch {
+      setError('Gagal memperbarui kata sandi');
+    }
+
+    setUpdatingPassword(false);
+  };
+
+  // ─── Delete User from Supabase Auth ───────────────────
+  const handleDeleteUser = async (userId: string, username?: string) => {
+    if (!confirm(`Yakin ingin menghapus user "${username || ''}" dari Supabase Authentication?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setSuccess(`User "${username || ''}" berhasil dihapus dari Supabase Auth!`);
+        await fetchUsers();
+        setTimeout(() => setSuccess(''), 4000);
+      } else {
+        setError(data.error || 'Gagal menghapus user');
+      }
+    } catch {
+      setError('Terjadi kesalahan saat menghapus user');
     }
   };
 
@@ -222,28 +185,20 @@ export default function AdminSettingPage() {
             <Shield className="w-6 h-6 text-accent-blue" />
             Admin Setting
           </h1>
-          <p className="text-sm text-text-secondary mt-1">Kelola data login dan hak akses pengguna aplikasi</p>
+          <p className="text-sm text-text-secondary mt-1">
+            Kelola data login terintegrasi langsung dengan <strong>Supabase Authentication &gt; Users</strong>
+          </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => fetchUsers()}
             disabled={loading}
             className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl"
-            title="Refresh Data"
+            title="Refresh Data dari Supabase"
           >
             <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
             Refresh
           </button>
-          {users.length === 0 && (
-            <button
-              onClick={handleSeedDefaults}
-              disabled={seeding}
-              className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border-accent-blue/30 text-accent-blue hover:bg-accent-blue/10"
-            >
-              {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Muat Akun Pegawai Default
-            </button>
-          )}
           <button
             onClick={() => { setShowModal(true); setError(''); }}
             className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl"
@@ -254,15 +209,15 @@ export default function AdminSettingPage() {
         </div>
       </div>
 
-      {/* Success Message */}
+      {/* Success Notification */}
       {success && (
         <div className="mb-6 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-3 animate-fadeIn">
-          <Save className="w-5 h-5 text-emerald-400 shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <p className="text-sm text-emerald-300 font-medium">{success}</p>
         </div>
       )}
 
-      {/* Error Message */}
+      {/* Error Notification */}
       {error && (
         <div className="mb-6 p-4 rounded-xl border border-accent-rose/30 bg-accent-rose/10 flex items-center gap-3 animate-fadeIn">
           <AlertCircle className="w-5 h-5 text-accent-rose shrink-0" />
@@ -275,13 +230,13 @@ export default function AdminSettingPage() {
         <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-glass-border)' }}>
           <div className="flex items-center gap-3">
             <Users className="w-5 h-5 text-accent-cyan" />
-            <h2 className="text-base font-bold text-text-primary">Daftar Pengguna</h2>
+            <h2 className="text-base font-bold text-text-primary">Daftar Pengguna (Supabase Auth)</h2>
             <span className="text-xs text-text-muted bg-white/5 px-2.5 py-0.5 rounded-full font-medium">
               {users.length} users terdaftar
             </span>
           </div>
           <span className="text-xs text-text-muted hidden sm:inline">
-            Klik ikon mata 👁️ untuk melihat kata sandi
+            Klik ikon mata 👁️ untuk lihat kata sandi | Ikon kunci 🔑 untuk ubah password
           </span>
         </div>
 
@@ -292,18 +247,17 @@ export default function AdminSettingPage() {
         ) : users.length === 0 ? (
           <div className="text-center py-16 px-4">
             <Users className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-40" />
-            <p className="text-text-primary font-medium text-base">Belum ada user terdaftar di tabel</p>
+            <p className="text-text-primary font-medium text-base">Belum ada user di Supabase Auth</p>
             <p className="text-text-muted text-xs mt-1 max-w-md mx-auto">
-              Anda bisa klik tombol &ldquo;Muat Akun Pegawai Default&rdquo; di atas untuk mengisi akun pegawai BPJS, atau klik &ldquo;Tambahkan Hak Akses&rdquo; untuk membuat user baru.
+              Klik &ldquo;Tambahkan Hak Akses&rdquo; untuk membuat user baru langsung ke Supabase Authentication.
             </p>
-            <div className="mt-5 flex justify-center gap-3">
+            <div className="mt-5 flex justify-center">
               <button
-                onClick={handleSeedDefaults}
-                disabled={seeding}
+                onClick={() => { setShowModal(true); setError(''); }}
                 className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm rounded-xl"
               >
-                {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Muat Akun Pegawai Default (Andreas, Khoiron, Wahyuadi)
+                <Plus className="w-4 h-4" />
+                Tambahkan User Baru
               </button>
             </div>
           </div>
@@ -372,13 +326,26 @@ export default function AdminSettingPage() {
                           : '-'}
                       </td>
                       <td>
-                        <button
-                          onClick={() => handleDeleteUser(user.id, displayUsername)}
-                          className="text-text-muted hover:text-accent-rose transition-colors p-1.5 rounded-lg hover:bg-accent-rose/10"
-                          title="Hapus user"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setEditPasswordUser(user);
+                              setNewPasswordVal('');
+                              setError('');
+                            }}
+                            className="text-text-muted hover:text-accent-amber transition-colors p-1.5 rounded-lg hover:bg-accent-amber/10"
+                            title="Ubah kata sandi akun"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id, displayUsername)}
+                            className="text-text-muted hover:text-accent-rose transition-colors p-1.5 rounded-lg hover:bg-accent-rose/10"
+                            title="Hapus user dari Supabase Auth"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -389,7 +356,73 @@ export default function AdminSettingPage() {
         )}
       </div>
 
-      {/* ========== ADD USER MODAL ========== */}
+      {/* ========== MODAL: UBAH KATA SANDI ========== */}
+      {editPasswordUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div
+            className="w-full max-w-md rounded-2xl p-6 shadow-2xl animate-scaleIn"
+            style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-glass-border)' }}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-accent-amber" />
+                Ubah Password Pengguna
+              </h3>
+              <button onClick={() => setEditPasswordUser(null)} className="btn-icon">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-text-secondary mb-4">
+              Ubah kata sandi untuk akun <span className="font-semibold text-text-primary">{editPasswordUser.username || editPasswordUser.email}</span>. Perubahan akan langsung disinkronkan ke <strong>Supabase Authentication</strong>.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-text-primary mb-1.5">
+                Kata Sandi Baru <span className="text-accent-rose">*</span>
+              </label>
+              <input
+                type="text"
+                className="input-base w-full font-mono text-sm"
+                placeholder="Minimal 6 karakter"
+                value={newPasswordVal}
+                onChange={(e) => setNewPasswordVal(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setEditPasswordUser(null)}
+                className="btn-secondary flex-1 py-2.5 text-sm rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdatePassword}
+                disabled={updatingPassword}
+                className="btn-primary flex-1 py-2.5 text-sm rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {updatingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Memperbarui...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Simpan Password
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL: TAMBAH HAK AKSES ========== */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div
@@ -399,24 +432,14 @@ export default function AdminSettingPage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
                 <Plus className="w-5 h-5 text-accent-blue" />
-                Tambahkan Hak Akses
+                Tambahkan Hak Akses Baru
               </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="btn-icon"
-              >
+              <button onClick={() => setShowModal(false)} className="btn-icon">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 rounded-xl border border-accent-rose/30 bg-accent-rose/10">
-                <p className="text-xs text-accent-rose">{error}</p>
-              </div>
-            )}
-
             <div className="space-y-4">
-              {/* Username */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
                   Username <span className="text-accent-rose">*</span>
@@ -430,7 +453,6 @@ export default function AdminSettingPage() {
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
                   Email <span className="text-accent-rose">*</span>
@@ -444,22 +466,20 @@ export default function AdminSettingPage() {
                 />
               </div>
 
-              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
                   Password <span className="text-accent-rose">*</span>
                 </label>
                 <input
                   type="text"
-                  className="input-base w-full font-mono"
+                  className="input-base w-full font-mono text-sm"
                   placeholder="Minimal 6 karakter"
                   value={newUser.password}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, password: e.target.value }))}
                 />
-                <p className="text-[11px] text-text-muted mt-1">Kata sandi akan tersimpan dan dapat dilihat oleh admin</p>
+                <p className="text-[11px] text-text-muted mt-1">Akun akan langsung terkonfirmasi di Supabase Auth dan bisa login</p>
               </div>
 
-              {/* Role */}
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
                   Role <span className="text-accent-rose">*</span>
@@ -498,7 +518,7 @@ export default function AdminSettingPage() {
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    Simpan User
+                    Simpan &amp; Aktifkan Akun
                   </>
                 )}
               </button>
