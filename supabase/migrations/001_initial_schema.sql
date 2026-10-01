@@ -118,6 +118,33 @@ CREATE POLICY "Authenticated users full access on file_uploads"
   USING (true)
   WITH CHECK (true);
 
+-- ─── Public / Anon Access Policies (Untuk pengisian Form) ──
+CREATE POLICY "Allow anon read published schemas"
+  ON form_schemas FOR SELECT
+  TO anon
+  USING (is_published = true);
+
+CREATE POLICY "Allow anon read active pegawai"
+  ON ref_pegawai FOR SELECT
+  TO anon
+  USING (is_active = true);
+
+CREATE POLICY "Allow anon read active faskes"
+  ON ref_faskes FOR SELECT
+  TO anon
+  USING (is_active = true);
+
+CREATE POLICY "Allow anon insert form responses"
+  ON form_responses FOR INSERT
+  TO anon
+  WITH CHECK (true);
+
+-- ─── Permissions Grant to anon & authenticated ─────────────
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
+
 -- ─── 8. Auto-update updated_at trigger ─────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
