@@ -73,11 +73,13 @@ Sebelum melakukan modifikasi atau menjalankan perintah apa pun di terminal JetBr
   - Validasi kompilasi akhir: `npm run build` sukses (exit code 0, 11 routes)
 
 ### 🔹 Status Terakhir / Pekerjaan yang Sedang Berjalan:
-- Fase 1, 2, dan 3 telah selesai dibangun dan teruji sukses secara lokal.
+- **BERHASIL DEPLOY KE PRODUCTION**: Aplikasi aktif di Vercel Production dengan domain `https://dashboard-lensa-sibling.vercel.app` (HTTP 200 OK).
+- Seluruh environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, kredensial Google Drive) telah terpasang di Vercel.
 
-### 🔹 Masalah yang Belum Terselesaikan (Langkah Pengguna / User Actions):
-- Menjalankan migration script `supabase/migrations/001_initial_schema.sql` pada SQL Editor di dashboard Supabase jika belum dieksekusi.
-- Push repository ke GitHub dan import ke platform Vercel untuk go-live.
+### 🔹 Langkah Tindakan Pengguna yang Tersisa:
+1. Mengaktifkan Google Drive API melalui tombol **Enable** di Google Cloud Console:
+   https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1007260183840
+2. Menjalankan skrip `supabase/migrations/001_initial_schema.sql` terbaru di SQL Editor Supabase untuk mengaktifkan izin tabel `GRANT` dan RLS.
 
 ---
 *Terakhir Diperbarui Oleh Agen pada: 2026-10-01*
